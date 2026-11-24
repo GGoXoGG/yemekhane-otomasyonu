@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yönetici paneli · Yemekhane</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <script type="module" src="/js/yonetici.js"></script>
+</head>
+<body data-sayfa="yonetici">
+  <header id="ust" class="ust" hidden></header>
+  <div class="kapsayici yerlesim">
+    <nav id="gezinti" class="gezinti" aria-label="Ana menü" hidden></nav>
+    <p id="ilk-hata" class="bildirim bildirim-hata" role="status" hidden></p>
+    <main id="icerik" hidden>
+      <h1>Yönetici paneli</h1>
+      <div id="bildirimler" role="status" class="bildirim-alani"></div>
+      <div class="yonetim-duzen">
+        <section class="panel menu-secimi">
+          <h2>Menü seç</h2>
+          <label for="menu-sec">Düzenlenecek menü</label>
+          <select id="menu-sec"></select>
+          <a href="#rapor-bolumu">Doluluk ve değerlendirme raporuna git</a>
+        </section>
+        <form id="menu-formu" class="panel menu-formu">
+          <h2 id="menu-form-basligi">Yeni menü</h2>
+          <fieldset id="menu-kimligi" class="araclar">
+            <legend>Menü bilgileri</legend>
+            <div><label for="menu-tarih">Tarih</label><input id="menu-tarih" name="tarih" type="date" required></div>
+            <div><label for="menu-yemekhane">Yemekhane</label><select id="menu-yemekhane" name="yemekhane_id" required></select></div>
+            <div><label for="menu-ogun">Öğün</label><select id="menu-ogun" name="ogun_id" required></select></div>
+          </fieldset>
+          <fieldset class="araclar">
+            <legend>Fiyatlar</legend>
+            <div><label for="ogrenci-fiyati">Öğrenci (TL)</label><input id="ogrenci-fiyati" name="ogrenci_fiyati" type="number" inputmode="decimal" min="0" max="999999.99" step="0.01" required></div>
+            <div><label for="personel-fiyati">Personel (TL)</label><input id="personel-fiyati" name="personel_fiyati" type="number" inputmode="decimal" min="0" max="999999.99" step="0.01" required></div>
+          </fieldset>
+          <fieldset>
+            <legend>Yemekler</legend>
+            <div id="yemek-secimi" class="yemek-secimi"></div>
+          </fieldset>
+          <button type="submit" class="dugme">Menüyü kaydet</button>
+        </form>
+      </div>
+      <section class="panel" id="rapor-bolumu">
+        <div class="panel-basligi">
+          <h2>Doluluk ve değerlendirme raporu</h2>
+          <button class="dugme dugme-ikincil" type="button" id="rapor-yenile">Yenile</button>
+        </div>
+        <div id="raporlar"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

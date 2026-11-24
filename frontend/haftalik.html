@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Haftalık menü · Yemekhane</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <script type="module" src="/js/menu.js"></script>
+</head>
+<body data-sayfa="haftalik">
+  <header id="ust" class="ust" hidden></header>
+  <div class="kapsayici yerlesim">
+    <nav id="gezinti" class="gezinti" aria-label="Ana menü" hidden></nav>
+    <p id="ilk-hata" class="bildirim bildirim-hata" role="status" hidden></p>
+    <main id="icerik" hidden>
+      <h1>Haftalık menü</h1>
+      <div id="bildirimler" role="status" class="bildirim-alani"></div>
+      <section class="panel araclar" aria-label="Haftalık menü filtreleri">
+        <div><label for="baslangic">İlk gün</label><input type="date" id="baslangic"></div>
+        <div><label for="yemekhane">Yemekhane</label><select id="yemekhane"></select></div>
+        <div><label for="ogun">Öğün</label><select id="ogun"></select></div>
+      </section>
+      <div id="menuler" class="menuler haftalik"></div>
+    </main>
+  </div>
+</body>
+</html>

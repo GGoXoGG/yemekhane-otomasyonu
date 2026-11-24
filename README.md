@@ -1,15 +1,14 @@
-# Yemekhane Otomasyonu · Başlangıç Paketi
+# Yemekhane Otomasyonu
 
-Web Teknolojileri dönem ödevinin hazır altyapısı. Veritabanı şeması, örnek veri, kaynak-replika
-replikasyonu, Redis ve Apache tek komutla çalışır. Sizin yazacağınız kısım **uygulama servisi ve arayüzdür**.
+Web Teknolojileri dersi dönem ödevi. Kampüs yemekhanesi için menü, rezervasyon ve bakiye işlemlerini içerir.
 
 ## Hızlı başlangıç
 
 Gerekenler: Docker Desktop (Windows/macOS) ya da Docker Engine + Compose v2 (Linux), Git.
 
 ```bash
-git clone <kendi-deponuz>
-cd yemekhane-baslangic
+git clone https://github.com/GGoXoGG/yemekhane-otomasyonu.git
+cd yemekhane-otomasyonu
 docker compose up -d
 docker compose ps -a
 ```
@@ -22,6 +21,7 @@ docker compose ps -a
 | mysql-replica | `Up (healthy)` |
 | redis | `Up (healthy)` |
 | frontend | `Up (healthy)` |
+| uygulama | `Up (healthy)` |
 | replica-setup | `Exited (0)` — işini yapıp çıkar, bu normaldir |
 
 `replica-setup` yalnızca `docker compose ps -a` ile görünür (`-a` olmadan çıkmış container'lar listelenmez).
@@ -31,12 +31,13 @@ Tarayıcıda: <http://localhost:8080>
 ## Klasör yapısı
 
 ```
-docker-compose.yml        servisler; uygulama servisi yorum satırında
+docker-compose.yml        Apache, Flask, MySQL ve Redis servisleri
 db/init/01_sema.sql       12 tablo, 3 view, 4 stored procedure
 db/init/02_ornek_veri.sql 30 kullanıcı, 52 yemek, 84 menü, ~365 rezervasyon
 db/replica-setup.sh       replikayı bir kez kurar ve salt okunur yapar
 apache/                   Apache 2.4 imajı ve yönlendirme ayarı (MVC / Web API)
 frontend/                 Apache'nin sunduğu HTML/CSS (css/temel.css başlangıç stilleri)
+uygulama/                 Flask API, MySQL sorguları ve bellek oturumları
 ```
 
 `db/init` içindeki dosyalar **yalnızca veritabanı ilk kez oluşturulurken** çalışır. Sonradan
@@ -131,20 +132,27 @@ CALL sp_turnike_gecis(7, 1, CONCAT(CURDATE(), ' 12:15:00'));
 
 Yordamlar yazma işlemidir; **kaynakta** (`mysql-primary`) çağrılır.
 
-## Uygulama servisini ekleme (Aşama 2)
+## Aşama 2 uygulaması
 
-1. Kodunuzu ve `Dockerfile`'ı `uygulama/` klasörüne koyun. Uygulama container içinde **8000**
-   portunu dinlesin (farklıysa `docker-compose.yml` içindeki `UYGULAMA_ADRES`'i değiştirin).
-2. `docker-compose.yml` sonundaki `uygulama:` bloğunun yorumlarını kaldırın.
-3. Uygulama bağlantı bilgilerini ortam değişkenlerinden okusun:
-   `DB_YAZMA_HOST`, `DB_OKUMA_HOST`, `DB_PORT`, `DB_ADI`, `DB_KULLANICI`, `DB_SIFRE`, `REDIS_HOST`, `REDIS_PORT`.
-4. Apache modunu seçin: `frontend` servisinde `command: ["httpd-foreground", "-D", "WEBAPI"]`
-   - **WEBAPI**: `/api/...` uygulamaya gider, geri kalanı `frontend/` klasöründen sunulur.
-     Uygulamanızın yolları `/api/` ile başlamalıdır.
-   - **MVC**: `/css/`, `/img/`, `/js/`, `/hata/` Apache'den, geri kalan her şey uygulamadan gelir.
-5. `docker compose up -d --build`
+Web API yapısını kullandım. Apache `frontend/` klasöründeki sayfaları sunar ve `/api/`
+isteklerini `uygulama/` klasöründeki Flask servisine iletir. Flask JSON döndürür.
 
-Uygulama henüz yoksa ya da çökmüşse Apache `frontend/hata/503.html` sayfasını gösterir.
+[Hazır test hesaplarından](#test-hesapları) biriyle giriş yapabilirsiniz. Apache, MySQL ve Redis
+host portları `127.0.0.1` ile sınırlı. Uygulamanın sağlık durumuna
+[`/api/saglik`](http://localhost:8080/api/saglik) adresinden bakabilirsiniz. Python kodu
+değiştiğinde `docker compose up -d --build uygulama` çalıştırın.
+
+### Rezervasyon akışı
+
+1. `frontend/js/menu.js` içindeki `rezervasyonAlani`, `ortak.js` içindeki `istek` ile
+   `POST /api/rezervasyonlar` gönderir.
+2. Apache isteği `uygulama/api.py` içindeki `rezervasyon_yap` fonksiyonuna iletir. Bu fonksiyon,
+   oturumdaki kullanıcı ID’siyle `repository.rezervasyon_yap` fonksiyonunu çağırır.
+3. `database.yordam`, `sp_rezervasyon_yap` yordamını primary’de çalıştırır. Flask ücret ve
+   bakiyeyi JSON olarak döndürür. Kullanıcı bu değerleri ekranda görür.
+
+Replica yeni işlemi hemen görmeyebilir. Bu yüzden rezervasyon, iptal ve yükleme sonrasındaki
+bakiye primary’de çalışan yordamın cevabından alınır. Liste ve raporlar replica’dan okunur.
 
 ## Doğrulama komutları (Aşama 1)
 

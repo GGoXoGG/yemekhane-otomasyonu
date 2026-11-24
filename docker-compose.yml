@@ -50,7 +50,7 @@ services:
       MYSQL_USER: yemekhane_app
       MYSQL_PASSWORD: Uyg_2026
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d:ro
       - mysql-primary-veri:/var/lib/mysql
@@ -67,7 +67,7 @@ services:
       TZ: Europe/Istanbul
       MYSQL_ROOT_PASSWORD: yemekhane_kok
     ports:
-      - "3308:3306"
+      - "127.0.0.1:3308:3306"
     volumes:
       - mysql-replica-veri:/var/lib/mysql
 
@@ -102,7 +102,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-veri:/data
     healthcheck:
@@ -123,7 +123,7 @@ services:
       # Uygulamanızın container içinde dinlediği adres. Port farklıysa burayı değiştirin.
       UYGULAMA_ADRES: http://uygulama:8000
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     volumes:
       - ./frontend:/usr/local/apache2/htdocs:ro
     healthcheck:
@@ -133,23 +133,26 @@ services:
       retries: 5
 
   # ---------------------------------------------------------------
-  # UYGULAMA · BU SERVİSİ SİZ YAZACAKSINIZ (Aşama 2)
-  # 1. ./uygulama klasörüne kodunuzu ve Dockerfile'ı koyun.
-  # 2. Uygulama container içinde 8000 portunu dinlesin (ya da UYGULAMA_ADRES'i değiştirin).
-  # 3. Aşağıdaki satırların başındaki "# " işaretlerini kaldırın.
+  # Flask JSON API · Apache üzerinden /api/
   # ---------------------------------------------------------------
-  # uygulama:
-  #   build: ./uygulama
-  #   restart: unless-stopped
-  #   environment:
-  #     <<: *uygulama-ortam
-  #   depends_on:
-  #     mysql-primary:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #     replica-setup:
-  #       condition: service_completed_successfully
+  uygulama:
+    build: ./uygulama
+    restart: unless-stopped
+    environment:
+      <<: *uygulama-ortam
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+      mysql-replica:
+        condition: service_healthy
+      replica-setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/api/saglik', timeout=5).close()"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 10s
 
 volumes:
   mysql-primary-veri:
