@@ -50,6 +50,10 @@ def menuler(kullanici_id, rol, baslangic, gun_sayisi, yemekhane_id, ogun_id):
         (rol, kullanici_id, baslangic, baslangic, gun_sayisi - 1,
          yemekhane_id, yemekhane_id, ogun_id, ogun_id),
     )
+    return _menuleri_topla(satirlar)
+
+
+def _menuleri_topla(satirlar):
     menuler = {}
     yemek_alanlari = ("yemek_id", "yemek", "kategori", "kalori", "vejetaryen", "alerjenler")
     for satir in satirlar:
@@ -59,8 +63,42 @@ def menuler(kullanici_id, rol, baslangic, gun_sayisi, yemekhane_id, ogun_id):
             yemek["vejetaryen"] = bool(yemek["vejetaryen"])
             menu["yemekler"].append(yemek)
             menu["toplam_kalori"] += yemek["kalori"]
-        menu["rezerve_edilebilir"] = bool(menu["rezerve_edilebilir"])
+        if "rezerve_edilebilir" in menu:
+            menu["rezerve_edilebilir"] = bool(menu["rezerve_edilebilir"])
     return list(menuler.values())
+
+
+def gunluk_menu(tarih, yemekhane_id, ogun_id):
+    satirlar = sorgu(
+        """
+        SELECT m.id AS menu_id, m.tarih, m.yemekhane_id, yh.ad AS yemekhane,
+               m.ogun_id, o.ad AS ogun, y.yemek_id, y.yemek, y.kategori,
+               y.kalori, y.vejetaryen, y.alerjenler
+          FROM menuler m
+          JOIN yemekhaneler yh ON yh.id = m.yemekhane_id
+          JOIN ogunler o ON o.id = m.ogun_id
+          LEFT JOIN v_menu_detay y ON y.menu_id = m.id
+         WHERE m.tarih = %s AND m.yemekhane_id = %s AND m.ogun_id = %s
+         ORDER BY y.kategori_sira, y.yemek
+        """, (tarih, yemekhane_id, ogun_id),
+    )
+    menuler = _menuleri_topla(satirlar)
+    return menuler[0] if menuler else None
+
+
+def replika_guncel_mi():
+    gtid = sorgu("SELECT @@GLOBAL.gtid_executed AS gtid", yazma=True, tek=True)["gtid"]
+    return sorgu(
+        "SELECT WAIT_FOR_EXECUTED_GTID_SET(%s, 1) AS sonuc", (gtid,), tek=True,
+    )["sonuc"] == 0
+
+
+def menu_kimligi(menu_id):
+    menu = sorgu(
+        "SELECT tarih, yemekhane_id, ogun_id FROM menuler WHERE id = %s",
+        (menu_id,), yazma=True, tek=True,
+    )
+    return (menu["tarih"], menu["yemekhane_id"], menu["ogun_id"]) if menu else None
 
 
 def rezervasyonlar(kullanici_id):
@@ -77,7 +115,11 @@ def rezervasyonlar(kullanici_id):
 
 
 def rezervasyon_yap(kullanici_id, menu_id):
-    return yordam("CALL sp_rezervasyon_yap(%s, %s)", (kullanici_id, menu_id))
+    sonuc = yordam("CALL sp_rezervasyon_yap(%s, %s)", (kullanici_id, menu_id))
+    durum = sorgu(
+        "SELECT bos_yer FROM v_menu_doluluk WHERE menu_id = %s", (menu_id,), yazma=True, tek=True,
+    )
+    return {**sonuc, **durum}
 
 
 def rezervasyon_iptal(kullanici_id, rezervasyon_id):

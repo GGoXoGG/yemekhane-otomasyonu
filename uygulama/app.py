@@ -1,9 +1,11 @@
 from datetime import date, datetime, time, timedelta
 from hmac import compare_digest
+from logging import INFO
 
 from flask import Flask, g, jsonify, request
 from flask.json.provider import DefaultJSONProvider
 from mysql.connector import Error
+from redis.exceptions import RedisError
 from werkzeug.exceptions import Forbidden, HTTPException, Unauthorized, UnsupportedMediaType
 
 from api import api
@@ -25,6 +27,7 @@ app = Flask(__name__)
 app.json = YemekhaneJSON(app)
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
 app.register_blueprint(api)
+app.logger.setLevel(INFO)
 
 
 @app.before_request
@@ -40,7 +43,8 @@ def api_kontrolu():
             raise UnsupportedMediaType("JSON içerik gönderin.")
     if request.endpoint == "api.giris":
         return
-    g.oturum = oturum.getir(request.cookies.get(oturum.CUKUR))
+    token = request.cookies.get(oturum.CUKUR)
+    g.oturum = oturum.getir(token)
     if g.oturum is None:
         raise Unauthorized("Oturum açmanız gerekiyor.")
     if yazma and not compare_digest(
@@ -49,14 +53,20 @@ def api_kontrolu():
         raise Forbidden("İstek doğrulanamadı.")
     g.kullanici = repo.kullanici(g.oturum["kullanici_id"])
     if g.kullanici is None:
-        oturum.kapat(request.cookies.get(oturum.CUKUR))
+        oturum.kapat(token)
         raise Unauthorized("Oturum açmanız gerekiyor.")
     if request.path.startswith("/api/yonetici/") and g.kullanici["rol"] != "yonetici":
         raise Forbidden("Bu işlem için yönetici yetkisi gerekiyor.")
+    if request.endpoint != "api.cikis":
+        if not oturum.yenile(token):
+            raise Unauthorized("Oturum açmanız gerekiyor.")
+        g.yenilenen_token = token
 
 
 @app.after_request
 def onbellek_kontrolu(yanit):
+    if g.get("yenilenen_token"):
+        oturum.cerez_yaz(yanit, g.yenilenen_token, request.is_secure)
     yanit.headers["Cache-Control"] = "no-store"
     return yanit
 
@@ -81,6 +91,12 @@ def veritabani_hatasi(hata):
         return jsonify(basarili=False, mesaj=hata.msg), 400
     app.logger.error("MySQL hatası (%s): %s", hata.errno, hata.msg)
     return jsonify(basarili=False, mesaj="Veritabanı işlemi tamamlanamadı."), 500
+
+
+@app.errorhandler(RedisError)
+def redis_hatasi(_):
+    app.logger.warning("Redis bağlantısı veya işlemi başarısız.")
+    return jsonify(basarili=False, mesaj="Redis hizmetine ulaşılamıyor. Biraz sonra tekrar deneyin."), 503
 
 
 if __name__ == "__main__":

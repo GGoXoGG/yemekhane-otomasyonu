@@ -141,6 +141,8 @@ services:
     environment:
       <<: *uygulama-ortam
     depends_on:
+      redis:
+        condition: service_healthy
       mysql-primary:
         condition: service_healthy
       mysql-replica:

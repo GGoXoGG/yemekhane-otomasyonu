@@ -154,6 +154,24 @@ değiştiğinde `docker compose up -d --build uygulama` çalıştırın.
 Replica yeni işlemi hemen görmeyebilir. Bu yüzden rezervasyon, iptal ve yükleme sonrasındaki
 bakiye primary’de çalışan yordamın cevabından alınır. Liste ve raporlar replica’dan okunur.
 
+## Aşama 3 · Redis
+
+Günlük menü, `menu:{yemekhane_id}:{tarih}:{ogun_id}` anahtarıyla İstanbul saatiyle gece
+yarısına kadar saklanır. Yönetici menüyü kaydedince ilgili anahtar silinir. Replika henüz
+yetişmediyse uygulama eski menüyü önbelleğe yazmaz. Haftalık menü ve rezervasyon durumu
+replica'dan okunur.
+
+Oturumlar `oturum:{token}` anahtarında 1800 saniye saklanır. Geçerli istekte Redis süresi ve
+çerez yenilenir. Çıkış anahtarı siler. Yalnız uygulama container'ı yeniden başlatıldığında oturum sürer.
+
+Aynı günlük menüyü önce açıp sonra yenileyin. Redis ve uygulama günlüklerine bakmak için
+
+```bash
+docker compose exec -T redis redis-cli --scan --pattern 'menu:*'
+docker compose exec -T redis redis-cli TTL "menu:1:$(TZ=Europe/Istanbul date +%F):2"
+docker compose logs --tail=80 uygulama | grep 'CACHE '
+```
+
 ## Doğrulama komutları (Aşama 1)
 
 ```bash

@@ -6,8 +6,10 @@ from flask import Blueprint, g, jsonify, request
 from mysql.connector import Error
 from werkzeug.exceptions import BadRequest, NotFound, Unauthorized
 
+import onbellek
 import oturum
 import repository as repo
+from redis_baglanti import redis
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
@@ -54,8 +56,10 @@ def para(deger, en_az, en_cok, hata):
 @api.get("/saglik")
 def saglik():
     durum = repo.saglik()
+    durum["redis"] = redis.ping()
     saglikli = (
-        durum["primary"]["server_id"] != durum["replica"]["server_id"]
+        durum["redis"]
+        and durum["primary"]["server_id"] != durum["replica"]["server_id"]
         and not durum["primary"]["read_only"] and durum["replica"]["read_only"]
     )
     return jsonify(basarili=bool(saglikli), **durum), 200 if saglikli else 503
@@ -77,10 +81,7 @@ def giris():
         raise Unauthorized("E-posta veya şifre hatalı.")
     token = oturum.ac(hesap["id"], request.cookies.get(oturum.CUKUR))
     yanit = jsonify(basarili=True)
-    yanit.set_cookie(
-        oturum.CUKUR, token, max_age=oturum.SURE, httponly=True,
-        secure=request.is_secure, samesite="Lax", path="/api",
-    )
+    oturum.cerez_yaz(yanit, token, request.is_secure)
     return yanit
 
 
@@ -110,17 +111,16 @@ def ogunler():
 @api.get("/menu/gunluk")
 @api.get("/menu/haftalik")
 def menu_listesi():
-    haftalik = request.path.endswith("/haftalik")
-    baslangic = request.args.get("baslangic") if haftalik else None
     yemekhane = request.args.get("yemekhane_id")
     ogun = request.args.get("ogun_id")
-    menuler = repo.menuler(
-        g.kullanici["id"], g.kullanici["rol"],
-        tarih(baslangic) if baslangic is not None else None,
-        7 if haftalik else 1,
-        kimlik(yemekhane, "Yemekhane", 255) if yemekhane is not None else None,
-        kimlik(ogun, "Öğün", 255) if ogun is not None else None,
-    )
+    yer_id = kimlik(yemekhane, "Yemekhane", 255) if yemekhane is not None else None
+    ogun_id = kimlik(ogun, "Öğün", 255) if ogun is not None else None
+    if request.path.endswith("/gunluk"):
+        menuler = onbellek.gunluk_menuler(yer_id, ogun_id)
+    else:
+        baslangic = request.args.get("baslangic")
+        ilk_gun = tarih(baslangic) if baslangic is not None else None
+        menuler = repo.menuler(g.kullanici["id"], g.kullanici["rol"], ilk_gun, 7, yer_id, ogun_id)
     return jsonify(basarili=True, menuler=menuler)
 
 
@@ -217,7 +217,7 @@ def menu_kaydet(menu_id=None):
     else:
         kimlik(menu_id, "Menü")
     try:
-        sonuc = repo.menu_kaydet(fiyatlar, yemekler, menu_id=menu_id, yeni_menu=yeni_menu)
+        sonuc = onbellek.menu_kaydet(fiyatlar, yemekler, menu_id=menu_id, yeni_menu=yeni_menu)
     except Error as hata:
         if hata.errno == 1062:
             raise BadRequest("Bu tarih, yemekhane ve öğün için zaten bir menü var.") from hata

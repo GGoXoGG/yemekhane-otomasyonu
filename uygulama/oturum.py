@@ -1,35 +1,40 @@
+import json
 from secrets import token_urlsafe
-from threading import Lock
-from time import monotonic
+
+from redis_baglanti import redis
 
 CUKUR = "yemekhane_oturum"
-SURE = 30 * 60
-_oturumlar = {}
-_kilit = Lock()
+SURE = 1800
 
 
 def ac(kullanici_id, eski_token=None):
-    simdi = monotonic()
     token = token_urlsafe(32)
-    oturum = {"kullanici_id": kullanici_id, "csrf": token_urlsafe(32), "son": simdi + SURE}
-    with _kilit:
-        for anahtar, kayit in list(_oturumlar.items()):
-            if kayit["son"] <= simdi:
-                _oturumlar.pop(anahtar)
-        _oturumlar.pop(eski_token, None)
-        _oturumlar[token] = oturum
+    kayit = json.dumps({"kullanici_id": kullanici_id, "csrf": token_urlsafe(32)})
+    with redis.pipeline() as istek:
+        istek.set(f"oturum:{token}", kayit, ex=SURE)
+        if eski_token:
+            istek.delete(f"oturum:{eski_token}")
+        istek.execute()
     return token
 
 
 def getir(token):
-    with _kilit:
-        kayit = _oturumlar.get(token)
-        if kayit and kayit["son"] > monotonic():
-            return kayit
-        _oturumlar.pop(token, None)
+    if not token:
         return None
+    kayit = redis.get(f"oturum:{token}")
+    return json.loads(kayit) if kayit else None
+
+
+def yenile(token):
+    return redis.expire(f"oturum:{token}", SURE)
 
 
 def kapat(token):
-    with _kilit:
-        _oturumlar.pop(token, None)
+    if token:
+        redis.delete(f"oturum:{token}")
+
+
+def cerez_yaz(yanit, token, guvenli):
+    yanit.set_cookie(
+        CUKUR, token, max_age=SURE, httponly=True, secure=guvenli, samesite="Lax", path="/api",
+    )

@@ -30,6 +30,7 @@ function rezervasyonAlani(menu) {
   const satir = eleman("div", null, "menu-alt");
   const durum = eleman("p", menu.rezervasyon_notu, "rezervasyon-kural soluk");
   durum.hidden = !menu.rezervasyon_notu;
+  const bosYer = eleman("span", `${menu.bos_yer} boş yer`);
   const dugme = eleman("button", "Rezervasyon yap", "dugme");
   dugme.disabled = !menu.rezerve_edilebilir;
   dugme.addEventListener("click", async () => {
@@ -37,6 +38,7 @@ function rezervasyonAlani(menu) {
     try {
       const sonuc = await istek("/api/rezervasyonlar", "POST", { menu_id: menu.menu_id });
       bakiyeGoster(sonuc.bakiye);
+      bosYer.textContent = `${sonuc.bos_yer} boş yer`;
       durum.textContent = "Rezervasyon durumu: Aktif";
       durum.hidden = false;
       bildir(`${sonuc.mesaj} Ücret ${para(sonuc.ucret)}. Güncel bakiye ${para(sonuc.bakiye)}.`, true);
@@ -45,7 +47,7 @@ function rezervasyonAlani(menu) {
       dugme.disabled = false;
     }
   });
-  satir.append(eleman("strong", para(menu.fiyat)), eleman("span", `${menu.bos_yer} boş yer`), dugme);
+  satir.append(eleman("strong", para(menu.fiyat)), bosYer, dugme);
   alan.append(satir, eleman("p", `Rezervasyon sonu ${zaman(menu.rezervasyon_son)}`, "yardim"), durum);
   return alan;
 }
