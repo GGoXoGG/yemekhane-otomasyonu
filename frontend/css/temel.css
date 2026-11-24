@@ -316,3 +316,8 @@ tr:last-child td { border-bottom: 0; }
   .yemek-secimi { grid-template-columns: minmax(0, 1fr); }
   .menu-alt .dugme { margin-left: 0; }
 }
+
+.alerjen-uyari { color: #9b2525; font-weight: 600; margin: .25rem 0; }
+.alerjen-secimleri { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .65rem; margin: 1rem 0; }
+.alerjen-secimleri label { display: flex; align-items: center; gap: .5rem; }
+.alerjen-secimleri input { width: auto; min-height: auto; }

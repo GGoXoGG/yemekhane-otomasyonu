@@ -1,5 +1,5 @@
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 import bcrypt
 from flask import Blueprint, g, jsonify, request
@@ -121,7 +121,39 @@ def menu_listesi():
         baslangic = request.args.get("baslangic")
         ilk_gun = tarih(baslangic) if baslangic is not None else None
         menuler = repo.menuler(g.kullanici["id"], g.kullanici["rol"], ilk_gun, 7, yer_id, ogun_id)
+        for menu in menuler:
+            menu["yarim_fiyat"] = (
+                (menu["fiyat"] * Decimal("0.60")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if menu["yarim_uygun"] else None
+            )
+    eslesmeler = repo.alerjen_eslesmeleri(g.kullanici["id"])
+    for menu in menuler:
+        for yemek in menu["yemekler"]:
+            yemek["kisisel_alerjenler"] = eslesmeler.get(yemek["yemek_id"], [])
     return jsonify(basarili=True, menuler=menuler)
+
+
+@api.get("/profil/alerjenler")
+def profil_alerjenleri():
+    return jsonify(basarili=True, alerjenler=repo.profil_alerjenleri(g.kullanici["id"]))
+
+
+@api.put("/profil/alerjenler")
+def profil_alerjenleri_kaydet():
+    secimler = veri_al().get("alerjen_idleri")
+    if not isinstance(secimler, list) or len(secimler) > 255:
+        raise BadRequest("Alerjen seçimlerini liste olarak gönderin.")
+    alerjenler = sorted({kimlik(deger, "Alerjen", 255) for deger in secimler})
+    try:
+        repo.profil_alerjenleri_kaydet(g.kullanici["id"], alerjenler)
+    except Error as hata:
+        if hata.errno == 1452:
+            raise BadRequest("Geçersiz alerjen seçimi.") from hata
+        raise
+    return jsonify(
+        basarili=True, mesaj="Alerjen seçimleri kaydedildi.",
+        alerjenler=repo.profil_alerjenleri(g.kullanici["id"]),
+    )
 
 
 @api.get("/rezervasyonlar")
@@ -131,8 +163,12 @@ def rezervasyon_listesi():
 
 @api.post("/rezervasyonlar")
 def rezervasyon_yap():
-    menu_id = kimlik(veri_al().get("menu_id"), "Menü")
-    sonuc = repo.rezervasyon_yap(g.kullanici["id"], menu_id)
+    veri = veri_al()
+    menu_id = kimlik(veri.get("menu_id"), "Menü")
+    porsiyon = veri.get("porsiyon", "tam")
+    if porsiyon not in ("tam", "yarim"):
+        raise BadRequest("Porsiyon geçersiz.")
+    sonuc = repo.rezervasyon_yap(g.kullanici["id"], menu_id, porsiyon)
     return jsonify(basarili=True, mesaj="Rezervasyon yapıldı.", durum="aktif", **sonuc), 201
 
 

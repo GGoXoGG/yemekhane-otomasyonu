@@ -25,10 +25,10 @@ async function rezervasyonlar() {
         dugme.disabled = false;
       }
     });
-    return [gun(kayit.tarih), kayit.yemekhane, kayit.ogun, para(kayit.ucret), durum, dugme];
+    return [gun(kayit.tarih), kayit.yemekhane, kayit.ogun, kayit.porsiyon === "yarim" ? "Yarım" : "Tam", para(kayit.ucret), durum, dugme];
   });
   hedef.replaceChildren(satirlar.length
-    ? tablo(["Tarih", "Yemekhane", "Öğün", "Ücret", "Durum", "İşlem"], satirlar)
+    ? tablo(["Tarih", "Yemekhane", "Öğün", "Porsiyon", "Ücret", "Durum", "İşlem"], satirlar)
     : eleman("p", "Henüz rezervasyonunuz yok.", "bos"));
 }
 

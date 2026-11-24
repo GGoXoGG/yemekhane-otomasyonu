@@ -5,6 +5,7 @@ const baglantilar = [
   ["rezervasyonlar", "Rezervasyonlarım"],
   ["bakiye", "Bakiye"],
   ["degerlendirme", "Değerlendirme"],
+  ["profil", "Profil"],
   ["yonetici", "Yönetici paneli"],
 ];
 const tarihBicimi = new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" });

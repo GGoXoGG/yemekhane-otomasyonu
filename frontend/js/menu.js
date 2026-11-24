@@ -20,6 +20,9 @@ function yemekListesi(yemekler) {
         yemek.alerjenler ? `Alerjenler: ${yemek.alerjenler}` : "Alerjen bilgisi yok"];
       satir.append(ust, eleman("p", ayrinti.join(" · "), "yemek-detay"));
     }
+    if (yemek.kisisel_alerjenler?.length) {
+      satir.append(eleman("p", `Alerjen uyarısı: ${yemek.kisisel_alerjenler.join(", ")}`, "alerjen-uyari"));
+    }
     liste.append(satir);
   }
   return yemekler.length ? liste : eleman("p", "Bu menüye henüz yemek eklenmemiş.", "bos");
@@ -31,23 +34,32 @@ function rezervasyonAlani(menu) {
   const durum = eleman("p", menu.rezervasyon_notu, "rezervasyon-kural soluk");
   durum.hidden = !menu.rezervasyon_notu;
   const bosYer = eleman("span", `${menu.bos_yer} boş yer`);
+  const porsiyon = eleman("select");
+  porsiyon.id = `porsiyon-${menu.menu_id}`;
+  porsiyon.append(new Option(`Tam porsiyon · ${para(menu.fiyat)}`, "tam"));
+  if (menu.yarim_uygun) porsiyon.append(new Option(`Yarım porsiyon · ${para(menu.yarim_fiyat)}`, "yarim"));
+  const etiket = eleman("label", "Porsiyon");
+  etiket.htmlFor = porsiyon.id;
+  const secim = eleman("div");
+  secim.append(etiket, porsiyon);
   const dugme = eleman("button", "Rezervasyon yap", "dugme");
-  dugme.disabled = !menu.rezerve_edilebilir;
+  porsiyon.disabled = dugme.disabled = !menu.rezerve_edilebilir;
   dugme.addEventListener("click", async () => {
-    dugme.disabled = true;
+    porsiyon.disabled = dugme.disabled = true;
     try {
-      const sonuc = await istek("/api/rezervasyonlar", "POST", { menu_id: menu.menu_id });
+      const sonuc = await istek("/api/rezervasyonlar", "POST", { menu_id: menu.menu_id, porsiyon: porsiyon.value });
       bakiyeGoster(sonuc.bakiye);
       bosYer.textContent = `${sonuc.bos_yer} boş yer`;
-      durum.textContent = "Rezervasyon durumu: Aktif";
+      const porsiyonAdi = sonuc.porsiyon === "yarim" ? "Yarım porsiyon" : "Tam porsiyon";
+      durum.textContent = `Rezervasyon durumu: Aktif · ${porsiyonAdi}`;
       durum.hidden = false;
       bildir(`${sonuc.mesaj} Ücret ${para(sonuc.ucret)}. Güncel bakiye ${para(sonuc.bakiye)}.`, true);
     } catch (hata) {
       bildir(hata.message);
-      dugme.disabled = false;
+      porsiyon.disabled = dugme.disabled = false;
     }
   });
-  satir.append(eleman("strong", para(menu.fiyat)), bosYer, dugme);
+  satir.append(secim, bosYer, dugme);
   alan.append(satir, eleman("p", `Rezervasyon sonu ${zaman(menu.rezervasyon_son)}`, "yardim"), durum);
   return alan;
 }

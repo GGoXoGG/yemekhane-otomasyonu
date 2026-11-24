@@ -1,0 +1,14 @@
+POST /api/giris → HTTP 200 
+GET /api/menu/gunluk?yemekhane_id=1&ogun_id=2 → HTTP 200 
+$ redis-cli --scan --pattern 'menu:*'
+menu:1:2026-11-24:1
+menu:2:2026-11-24:2
+menu:1:2026-11-24:2
+$ redis-cli EXISTS 'oturum:<maskeli>'
+1
+$ redis-cli DEL menu:1:2026-11-24:1 menu:2:2026-11-24:2 menu:1:2026-11-24:2
+3
+$ redis-cli --scan --pattern 'menu:*'
+(boş)
+$ redis-cli EXISTS 'oturum:<maskeli>'
+1

@@ -28,6 +28,7 @@ def menuler(kullanici_id, rol, baslangic, gun_sayisi, yemekhane_id, ogun_id):
         """
         SELECT m.id AS menu_id, d.tarih, d.yemekhane, d.ogun, d.bos_yer, d.rezervasyon_son,
                IF(%s = 'ogrenci', m.ogrenci_fiyati, m.personel_fiyati) AS fiyat,
+               o.ad IN ('Öğle', 'Akşam') AS yarim_uygun,
                r.durum AS rezervasyon_durumu,
                NOW() < d.rezervasyon_son AND d.bos_yer > 0
                    AND COALESCE(r.durum, 'iptal') = 'iptal' AS rezerve_edilebilir,
@@ -104,7 +105,7 @@ def menu_kimligi(menu_id):
 def rezervasyonlar(kullanici_id):
     return sorgu(
         """
-        SELECT r.id, r.menu_id, d.tarih, d.yemekhane, d.ogun, r.ucret, r.durum,
+        SELECT r.id, r.menu_id, d.tarih, d.yemekhane, d.ogun, r.ucret, r.durum, r.porsiyon,
                d.rezervasyon_son, r.durum = 'aktif' AND NOW() < d.rezervasyon_son AS iptal_edilebilir
           FROM rezervasyonlar r
           JOIN v_menu_doluluk d ON d.menu_id = r.menu_id
@@ -114,8 +115,8 @@ def rezervasyonlar(kullanici_id):
     )
 
 
-def rezervasyon_yap(kullanici_id, menu_id):
-    sonuc = yordam("CALL sp_rezervasyon_yap(%s, %s)", (kullanici_id, menu_id))
+def rezervasyon_yap(kullanici_id, menu_id, porsiyon):
+    sonuc = yordam("CALL sp_rezervasyon_yap(%s, %s, %s)", (kullanici_id, menu_id, porsiyon))
     durum = sorgu(
         "SELECT bos_yer FROM v_menu_doluluk WHERE menu_id = %s", (menu_id,), yazma=True, tek=True,
     )
@@ -231,3 +232,41 @@ def raporlar():
 def saglik():
     sql = "SELECT @@server_id AS server_id, @@global.read_only AS read_only"
     return {"primary": sorgu(sql, yazma=True, tek=True), "replica": sorgu(sql, tek=True)}
+
+
+
+def profil_alerjenleri(kullanici_id):
+    return sorgu(
+        """
+        SELECT a.id, a.ad, ka.kullanici_id IS NOT NULL AS secili
+          FROM alerjenler a
+          LEFT JOIN kullanici_alerjenleri ka ON ka.alerjen_id = a.id AND ka.kullanici_id = %s
+         ORDER BY a.ad
+        """, (kullanici_id,), yazma=True,
+    )
+
+
+def profil_alerjenleri_kaydet(kullanici_id, alerjenler):
+    with islem() as cursor:
+        cursor.execute("SELECT id FROM kullanicilar WHERE id = %s FOR UPDATE", (kullanici_id,))
+        cursor.execute("DELETE FROM kullanici_alerjenleri WHERE kullanici_id = %s", (kullanici_id,))
+        if alerjenler:
+            cursor.executemany(
+                "INSERT INTO kullanici_alerjenleri (kullanici_id, alerjen_id) VALUES (%s, %s)",
+                [(kullanici_id, alerjen_id) for alerjen_id in alerjenler],
+            )
+
+
+def alerjen_eslesmeleri(kullanici_id):
+    satirlar = sorgu(
+        """
+        SELECT ya.yemek_id, a.ad FROM kullanici_alerjenleri ka
+          JOIN yemek_alerjenleri ya ON ya.alerjen_id = ka.alerjen_id
+          JOIN alerjenler a ON a.id = ka.alerjen_id
+         WHERE ka.kullanici_id = %s ORDER BY a.ad
+        """, (kullanici_id,), yazma=True,
+    )
+    eslesmeler = {}
+    for satir in satirlar:
+        eslesmeler.setdefault(satir["yemek_id"], []).append(satir["ad"])
+    return eslesmeler

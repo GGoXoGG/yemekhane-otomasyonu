@@ -34,14 +34,14 @@ Tarayıcıda: <http://localhost:8080>
 docker-compose.yml        Apache, Flask, MySQL ve Redis servisleri
 db/init/01_sema.sql       12 tablo, 3 view, 4 stored procedure
 db/init/02_ornek_veri.sql 30 kullanıcı, 52 yemek, 84 menü, ~365 rezervasyon
+db/init/04_degisiklik.sql porsiyon ve kişisel alerjen profili
 db/replica-setup.sh       replikayı bir kez kurar ve salt okunur yapar
 apache/                   Apache 2.4 imajı ve yönlendirme ayarı (MVC / Web API)
 frontend/                 Apache'nin sunduğu HTML/CSS (css/temel.css başlangıç stilleri)
-uygulama/                 Flask API, MySQL sorguları ve bellek oturumları
+uygulama/                 Flask API, MySQL sorguları ve Redis oturumları
 ```
 
-`db/init` içindeki dosyalar **yalnızca veritabanı ilk kez oluşturulurken** çalışır. Sonradan
-değiştirirseniz etkisini görmek için `docker compose down -v` ile sıfırlamanız gerekir.
+`db/init` dosyaları veritabanı ilk kez oluşturulurken çalışır. Mevcut kurulum için aşağıdaki migration adımlarını uygulayın.
 
 ## Bağlantı bilgileri
 
@@ -108,7 +108,7 @@ Para hareketi yapan işlemleri veri katmanında SQL ile yeniden yazmayın; bu yo
 
 | Yordam | Parametreler | Başarıda dönen tek satır |
 |---|---|---|
-| `sp_rezervasyon_yap` | `kullanici_id, menu_id` | `rezervasyon_id, ucret, bakiye` |
+| `sp_rezervasyon_yap` | `kullanici_id, menu_id, porsiyon` | `rezervasyon_id, ucret, bakiye, porsiyon` |
 | `sp_rezervasyon_iptal` | `kullanici_id, rezervasyon_id` | `rezervasyon_id, iade, bakiye` |
 | `sp_bakiye_yukle` | `kullanici_id, tutar` (10–1000 TL) | `hareket_id, bakiye` |
 | `sp_turnike_gecis` | `kullanici_id, yemekhane_id, zaman` | `rezervasyon_id, menu_id, ogun` |
@@ -203,14 +203,17 @@ komut satırına yazdığınız için çıkan uyarı satırını önemsemeyin.
 
 ## Migration (Aşama 4)
 
-`04_degisiklik.sql` dosyasını `db/init/` klasörüne koyun. Böylece depoyu sıfırdan kuran biri
-(`docker compose up -d`) değişikliği otomatik alır. Çalışan sistemde ise kaynağa elle uygulayın:
+Öğle ve akşamda yarım porsiyon tam fiyatın %60'ıdır. Profil sayfasında seçilen alerjenler günlük ve haftalık menüde uyarı olarak gösterilir.
+
+Yeni kurulumda `docker compose up -d`, `db/init/04_degisiklik.sql` dosyasını otomatik çalıştırır. Mevcut veritabanını güncellerken dosyayı yalnızca primary üzerinde uygulayın:
 
 ```bash
-docker compose exec -T mysql-primary mysql -uroot -pyemekhane_kok yemekhane < db/init/04_degisiklik.sql
+docker compose exec -T mysql-primary sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --default-character-set=utf8mb4 -uroot yemekhane' < db/init/04_degisiklik.sql
+docker compose exec -T redis sh -c "redis-cli --scan --pattern 'menu:*' | xargs -r redis-cli DEL"
+docker compose up -d --build
 ```
 
-Replikaya ayrıca uygulamayın; değişiklik replikasyonla geçer. `03` numarası boş bırakılmıştır.
+Replika değişikliği replikasyonla alır. Redis temizliği yalnızca menü anahtarlarını kaldırır.
 
 ## Sıfırlama
 

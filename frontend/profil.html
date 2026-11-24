@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alerjen profili · Yemekhane</title>
+  <link rel="stylesheet" href="/css/temel.css">
+  <script type="module" src="/js/profil.js"></script>
+</head>
+<body data-sayfa="profil">
+  <header id="ust" class="ust" hidden></header>
+  <div class="kapsayici yerlesim">
+    <nav id="gezinti" class="gezinti" aria-label="Ana menü" hidden></nav>
+    <p id="ilk-hata" class="bildirim bildirim-hata" role="status" hidden></p>
+    <main id="icerik" hidden>
+      <h1>Alerjen profili</h1>
+      <div id="bildirimler" role="status" class="bildirim-alani"></div>
+      <form class="panel" id="alerjen-formu">
+        <p>Menüde uyarı görmek istediğiniz alerjenleri seçin.</p>
+        <div id="alerjenler" class="alerjen-secimleri"></div>
+        <button class="dugme" disabled>Seçimleri kaydet</button>
+      </form>
+    </main>
+  </div>
+</body>
+</html>
